@@ -1,7 +1,6 @@
 use crate::node::{NodeRepr, ShallowNodeRepr};
 use crate::reconcile::reconcile;
 use crate::std::prelude::*;
-use serde_json::json;
 use std::cell::UnsafeCell;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
@@ -174,7 +173,8 @@ impl MainHandle {
 
         if let Some(graph) = directive.graph {
             let instructions = reconcile(&mut self.node_map, &graph);
-            let result = self.inner.apply_instructions(&instructions);
+            let serialized = serde_json::to_value(instructions).unwrap();
+            let result = self.inner.apply_instructions(&serialized);
             println!("Apply instructions result: {}", result.unwrap_or(-1));
 
             result

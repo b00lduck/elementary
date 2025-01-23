@@ -5,8 +5,8 @@ use crate::node::{NodeRepr, ShallowNodeRepr};
 use serde::ser::{Serialize, SerializeTuple, Serializer};
 // use rpds::RedBlackTreeMap;
 
-#[derive(Eq, PartialEq)]
-enum Instruction {
+#[derive(Debug, Eq, PartialEq)]
+pub enum Instruction {
     Create(i32, String),
     AppendChild(i32, i32, u32),
     SetProperty(i32, String, serde_json::Value),
@@ -82,7 +82,7 @@ impl Serialize for Instruction {
 pub fn reconcile(
     node_map: &mut BTreeMap<i32, ShallowNodeRepr>,
     roots: &Vec<NodeRepr>,
-) -> serde_json::Value {
+) -> Vec<Instruction> {
     let mut visited: HashSet<i32> = HashSet::new();
     let mut queue: VecDeque<&NodeRepr> = VecDeque::from_iter(roots.iter());
     let mut instructions: Vec<Instruction> = Vec::new();
@@ -142,13 +142,15 @@ pub fn reconcile(
 
     // Sort so that creates land before appends, etc
     instructions.sort();
-    serde_json::to_value(instructions).unwrap()
+    instructions
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::std::prelude::*;
+    use serde_json::json;
+    use serde_json::Value::Null;
 
     #[test]
     fn it_works() {
@@ -157,6 +159,20 @@ mod tests {
         let roots = vec![graph];
         let instructions = reconcile(&mut node_map, &roots);
 
-        dbg!(instructions);
+        assert_eq!(
+            instructions,
+            vec![
+                Instruction::Create(186452590, "root".to_string()),
+                Instruction::Create(-173258319, "phasor".to_string()),
+                Instruction::Create(-93964182, "const".to_string()),
+                Instruction::AppendChild(186452590, -173258319, 0),
+                Instruction::SetProperty(186452590, "channel".to_string(), json!(0.0)),
+                Instruction::AppendChild(-173258319, -93964182, 0),
+                Instruction::SetProperty(-93964182, "key".to_string(), Null),
+                Instruction::SetProperty(-93964182, "value".to_string(), json!(110.0)),
+                Instruction::ActivateRoots(vec![186452590]),
+                Instruction::Commit,
+            ]
+        );
     }
 }
