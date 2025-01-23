@@ -1,80 +1,162 @@
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashSet, VecDeque};
 
 use crate::node::{NodeRepr, ShallowNodeRepr};
-use serde_json::json;
+use serde::ser::{Serialize, SerializeTuple, Serializer};
 // use rpds::RedBlackTreeMap;
+
+#[derive(Eq, PartialEq)]
+enum Instruction {
+    Create(i32, String),
+    AppendChild(i32, i32, u32),
+    SetProperty(i32, String, serde_json::Value),
+    ActivateRoots(Vec<i32>),
+    Commit,
+}
+
+impl PartialOrd for Instruction {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Instruction {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Instruction::Create(_, _), Instruction::Create(_, _)) => Ordering::Equal,
+            (Instruction::Create(_, _), _) => Ordering::Less,
+            (_, _) => Ordering::Equal,
+        }
+    }
+}
+
+impl Serialize for Instruction {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            Self::Create(hash, kind) => {
+                let mut tup = serializer.serialize_tuple(3)?;
+                let tag: i32 = 0;
+                tup.serialize_element(&tag)?;
+                tup.serialize_element(hash)?;
+                tup.serialize_element(kind)?;
+                tup.end()
+            }
+            Self::AppendChild(parent_hash, child_hash, output_channel) => {
+                let mut tup = serializer.serialize_tuple(4)?;
+                let tag: i32 = 2;
+                tup.serialize_element(&tag)?;
+                tup.serialize_element(parent_hash)?;
+                tup.serialize_element(child_hash)?;
+                tup.serialize_element(output_channel)?;
+                tup.end()
+            }
+            Self::SetProperty(hash, key, value) => {
+                let mut tup = serializer.serialize_tuple(4)?;
+                let tag: i32 = 3;
+                tup.serialize_element(&tag)?;
+                tup.serialize_element(hash)?;
+                tup.serialize_element(key)?;
+                tup.serialize_element(value)?;
+                tup.end()
+            }
+            Self::ActivateRoots(roots) => {
+                let mut tup = serializer.serialize_tuple(2)?;
+                let tag: i32 = 4;
+                tup.serialize_element(&tag)?;
+                tup.serialize_element(roots)?;
+                tup.end()
+            }
+            Self::Commit => {
+                let mut tup = serializer.serialize_tuple(1)?;
+                let tag: i32 = 5;
+                tup.serialize_element(&tag)?;
+                tup.end()
+            }
+        }
+    }
+}
 
 pub fn reconcile(
     node_map: &mut BTreeMap<i32, ShallowNodeRepr>,
     roots: &Vec<NodeRepr>,
 ) -> serde_json::Value {
     let mut visited: HashSet<i32> = HashSet::new();
-    let mut queue: VecDeque<&NodeRepr> = VecDeque::new();
-    let mut instructions = serde_json::Value::Array(vec![]);
+    let mut queue: VecDeque<&NodeRepr> = VecDeque::from_iter(roots.iter());
+    let mut instructions: Vec<Instruction> = Vec::new();
 
-    for root in roots.iter() {
-        // TODO: ref?
-        queue.push_back(root);
-    }
+    loop {
+        match queue.pop_front() {
+            None => break,
+            Some(next) => {
+                if visited.contains(&next.hash) {
+                    continue;
+                }
 
-    while !queue.is_empty() {
-        let next = queue.pop_front().unwrap();
+                // Mount
+                if !node_map.contains_key(&next.hash) {
+                    // Create node
+                    instructions.push(Instruction::Create(next.hash, next.kind.clone()));
 
-        if visited.contains(&next.hash) {
-            continue;
-        }
+                    // Append child
+                    for child in next.children.iter() {
+                        instructions.push(Instruction::AppendChild(
+                            next.hash,
+                            child.hash,
+                            child.output_channel,
+                        ));
+                    }
 
-        // Mount
-        node_map.entry(next.hash).or_insert_with(|| {
-            // Create node
-            instructions
-                .as_array_mut()
-                .unwrap()
-                .push(json!([0, next.hash, next.kind]));
+                    node_map.insert(next.hash, next.into());
+                }
 
-            // Append child
-            for child in next.children.iter() {
-                instructions.as_array_mut().unwrap().push(json!([
-                    2,
-                    next.hash,
-                    child.hash,
-                    child.output_channel
-                ]));
+                // Props
+                for (name, value) in &next.props {
+                    // TODO: Only add the instruction if the prop value != existing prop value
+                    instructions.push(Instruction::SetProperty(
+                        next.hash,
+                        name.clone(),
+                        value.clone(),
+                    ));
+                }
+
+                // Visit children
+                for child in next.children.iter() {
+                    queue.push_back(child);
+                }
+
+                visited.insert(next.hash);
             }
-
-            next.into()
-        });
-
-        // Props
-        for (name, value) in &next.props {
-            // TODO: Only add the instruction if the prop value != existing prop value
-            instructions
-                .as_array_mut()
-                .unwrap()
-                .push(json!([3, next.hash, name, value]));
         }
-
-        for child in next.children.iter() {
-            queue.push_back(child);
-        }
-
-        visited.insert(next.hash);
     }
 
     // Activate roots
-    instructions.as_array_mut().unwrap().push(json!([
-        4,
-        roots.iter().map(|n| n.hash).collect::<Vec<i32>>()
-    ]));
+    instructions.push(Instruction::ActivateRoots(
+        roots.iter().map(|n| n.hash).collect::<Vec<i32>>(),
+    ));
 
     // Commit
-    instructions.as_array_mut().unwrap().push(json!([5]));
+    instructions.push(Instruction::Commit);
 
     // Sort so that creates land before appends, etc
-    instructions
-        .as_array_mut()
-        .unwrap()
-        .sort_by(|a, b| a[0].as_i64().cmp(&b[0].as_i64()));
+    instructions.sort();
+    serde_json::to_value(instructions).unwrap()
+}
 
-    instructions
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::std::prelude::*;
+
+    #[test]
+    fn it_works() {
+        let graph = root(phasor(constant!({key: None, value: 110.0})));
+        let mut node_map = BTreeMap::new();
+        let roots = vec![graph];
+        let instructions = reconcile(&mut node_map, &roots);
+
+        dbg!(instructions);
+    }
 }

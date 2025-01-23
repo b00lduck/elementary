@@ -22,7 +22,7 @@ pub extern "C" fn elem_engine_new(sample_rate: f64, block_size: usize) -> *mut E
         phasor(constant!({key: None, value: 110.0})),
     )));
 
-    let _ = main.render(elem::engine::ResolvedDirective {
+    let _ = main.render(elem::engine::Directive {
         graph: Some(vec![cycle]),
         resources: None,
     });
