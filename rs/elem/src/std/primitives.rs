@@ -55,3 +55,49 @@ macro_rules! constant {
 }
 
 pub use crate::constant;
+
+pub fn cv(x: f64) -> NodeRepr {
+    constant!({key: None, value: x})
+}
+
+pub fn le(x: NodeRepr, y: NodeRepr) -> NodeRepr {
+    create_node("le", Default::default(), vec![x, y])
+}
+
+pub fn train(x: NodeRepr) -> NodeRepr {
+    le(phasor(x), cv(0.5))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SampleNodeProps {
+    pub key: Option<String>,
+    pub path: String,
+}
+
+pub fn sample(props: &SampleNodeProps, gate: NodeRepr) -> NodeRepr {
+    create_node(
+        "sample",
+        serde_json::to_value(&props)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .clone(),
+        vec![gate],
+    )
+}
+
+#[macro_export]
+macro_rules! sample {
+    // Match the macro pattern with a key-value pair in the first argument
+    ({$($key:ident: $value:expr),*}, $gate:expr) => {
+        {
+            // Create the props struct with the provided key-value pairs
+            let props = SampleNodeProps { $($key: $value),* };
+
+            // Call the constant function with the constructed props
+            sample(&props, $gate)
+        }
+    };
+}
+
+pub use crate::sample;

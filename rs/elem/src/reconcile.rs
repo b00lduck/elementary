@@ -149,30 +149,27 @@ pub fn reconcile(
 mod tests {
     use super::*;
     use crate::std::prelude::*;
-    use serde_json::json;
-    use serde_json::Value::Null;
 
     #[test]
-    fn it_works() {
-        let graph = root(phasor(constant!({key: None, value: 110.0})));
+    fn basic() {
         let mut node_map = BTreeMap::new();
-        let roots = vec![graph];
-        let instructions = reconcile(&mut node_map, &roots);
+        let graph = vec![root(phasor(constant!({key: None, value: 110.0})))];
+        let instructions = reconcile(&mut node_map, &graph);
 
-        assert_eq!(
-            instructions,
-            vec![
-                Instruction::Create(186452590, "root".to_string()),
-                Instruction::Create(-173258319, "phasor".to_string()),
-                Instruction::Create(-93964182, "const".to_string()),
-                Instruction::AppendChild(186452590, -173258319, 0),
-                Instruction::SetProperty(186452590, "channel".to_string(), json!(0.0)),
-                Instruction::AppendChild(-173258319, -93964182, 0),
-                Instruction::SetProperty(-93964182, "key".to_string(), Null),
-                Instruction::SetProperty(-93964182, "value".to_string(), json!(110.0)),
-                Instruction::ActivateRoots(vec![186452590]),
-                Instruction::Commit,
-            ]
-        );
+        insta::assert_json_snapshot!(instructions);
+    }
+
+    #[test]
+    fn distinguish_by_props() {
+        let voice =
+            |path| sample!({key: None, path: path}, train(constant!({key: None, value: 1.0})));
+        let mut node_map = BTreeMap::new();
+        let graph = vec![
+            voice(String::from("test.wav")),
+            voice(String::from("test2.wav")),
+        ];
+        let instructions = reconcile(&mut node_map, &graph);
+
+        insta::assert_json_snapshot!(instructions);
     }
 }
