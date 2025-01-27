@@ -43,6 +43,7 @@ fn main() {
                     samples.as_mut_ptr(),
                     num_channels,
                     samples.len(),
+                    std::ptr::null_mut::<()>(),
                 );
             }
         },

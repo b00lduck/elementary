@@ -47,6 +47,7 @@ pub extern "C" fn elem_engine_process(
     output_data: *mut f32,
     num_channels: usize,
     num_frames: usize,
+    user_data: *mut std::ffi::c_void,
 ) {
     if ptr.is_null() {
         return;
@@ -56,5 +57,5 @@ pub extern "C" fn elem_engine_process(
 
     handles
         .proc
-        .process(input_data, output_data, num_channels, num_frames);
+        .process(input_data, output_data, num_channels, num_frames, user_data);
 }

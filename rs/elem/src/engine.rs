@@ -52,12 +52,14 @@ mod ffi {
         fn apply_instructions(self: Pin<&mut RuntimeBindings>, batch: &String) -> i32;
         fn process_queued_events(self: Pin<&mut RuntimeBindings>) -> String;
 
+        type c_void;
         unsafe fn process(
             self: Pin<&mut RuntimeBindings>,
             input_data: *const f32,
             output_data: *mut f32,
             num_channels: usize,
             num_frames: usize,
+            user_data: *mut c_void,
         ) -> ();
     }
 }
@@ -128,12 +130,13 @@ impl ProcessHandle {
         Self { inner }
     }
 
-    pub fn process(
+    pub fn process<T>(
         &self,
         input_data: *const f32,
         output_data: *mut f32,
         num_channels: usize,
         num_frames: usize,
+        user_data: *mut T,
     ) {
         unsafe {
             self.inner
@@ -143,7 +146,13 @@ impl ProcessHandle {
                 .unwrap()
                 .as_mut()
                 .unwrap()
-                .process(input_data, output_data, num_channels, num_frames);
+                .process(
+                    input_data,
+                    output_data,
+                    num_channels,
+                    num_frames,
+                    user_data as *mut ffi::c_void,
+                );
         }
     }
 }

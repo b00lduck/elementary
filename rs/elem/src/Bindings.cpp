@@ -48,7 +48,7 @@ rust::String RuntimeBindings::process_queued_events()
     return rust::String(elem::js::serialize(batch));
 }
 
-void RuntimeBindings::process(const float* inputData, float* outputData, size_t numChannels, size_t numFrames)
+void RuntimeBindings::process(const float* inputData, float* outputData, size_t numChannels, size_t numFrames, c_void* userData)
 {
     std::array<float*, 32> outChans;
 
@@ -62,7 +62,7 @@ void RuntimeBindings::process(const float* inputData, float* outputData, size_t 
         outChans.data(),
         numChannels,
         numFrames,
-        nullptr
+        userData
     );
 }
 
