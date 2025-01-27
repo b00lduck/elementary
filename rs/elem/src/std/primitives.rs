@@ -18,12 +18,17 @@ pub fn mul2(x: NodeRepr, y: NodeRepr) -> NodeRepr {
     create_node("mul", Default::default(), vec![x, y])
 }
 
+pub fn add2(x: NodeRepr, y: NodeRepr) -> NodeRepr {
+    create_node("add", Default::default(), vec![x, y])
+}
+
 pub fn phasor(rate: NodeRepr) -> NodeRepr {
     create_node("phasor", Default::default(), vec![rate])
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ConstNodeProps {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
     pub value: f64,
 }

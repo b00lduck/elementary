@@ -172,4 +172,34 @@ mod tests {
 
         insta::assert_json_snapshot!(instructions);
     }
+
+    #[test]
+    fn structural_equality_with_value_change() {
+        let mut node_map = BTreeMap::new();
+
+        let voice = |key, freq| {
+            sin(mul2(
+                cv(2.0 * std::f64::consts::PI),
+                phasor(constant!({key: Some(key), value: freq})),
+            ))
+        };
+
+        let graph = vec![add2(
+            voice(String::from("v1"), 110.0),
+            voice(String::from("v2"), 111.0),
+        )];
+
+        // For the sake of this test, we don't care about this first pass
+        let _ = reconcile(&mut node_map, &graph);
+
+        // Now we build a second graph aiming to see that the instruction
+        // set produced contains only a single SetProperty
+        let graph2 = vec![add2(
+            voice(String::from("v1"), 112.0),
+            voice(String::from("v2"), 111.0),
+        )];
+
+        let instructions = reconcile(&mut node_map, &graph);
+        insta::assert_json_snapshot!(instructions);
+    }
 }

@@ -18,7 +18,11 @@ pub fn create_node(
     let mut hasher = DefaultHasher::new();
 
     kind.hash(&mut hasher);
-    props.hash(&mut hasher);
+
+    match props.get("key") {
+        Some(k) => k.hash(&mut hasher),
+        None => props.hash(&mut hasher),
+    };
 
     for child in children.iter() {
         child.hash.hash(&mut hasher);
