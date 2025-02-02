@@ -38,11 +38,11 @@ pub fn create_node(
 }
 
 pub struct ShallowNodeRepr {
-    hash: i32,
-    kind: String,
-    props: serde_json::Map<String, serde_json::Value>,
-    output_channel: u32,
-    children: Vec<i32>,
+    pub hash: i32,
+    pub kind: String,
+    pub props: serde_json::Map<String, serde_json::Value>,
+    pub output_channel: u32,
+    pub children: Vec<i32>,
 }
 
 impl From<&NodeRepr> for ShallowNodeRepr {
@@ -50,7 +50,7 @@ impl From<&NodeRepr> for ShallowNodeRepr {
         ShallowNodeRepr {
             hash: node.hash,
             kind: node.kind.clone(),
-            props: node.props.clone(),
+            props: Default::default(),
             output_channel: node.output_channel,
             children: node.children.iter().map(|n| n.hash).collect::<Vec<i32>>(),
         }

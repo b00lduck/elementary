@@ -96,7 +96,7 @@ pub fn reconcile(
                 }
 
                 // Mount
-                if !node_map.contains_key(&next.hash) {
+                let existing = node_map.entry(next.hash).or_insert_with(|| {
                     // Create node
                     instructions.push(Instruction::Create(next.hash, next.kind.clone()));
 
@@ -109,17 +109,29 @@ pub fn reconcile(
                         ));
                     }
 
-                    node_map.insert(next.hash, next.into());
-                }
+                    next.into()
+                });
 
                 // Props
                 for (name, value) in &next.props {
-                    // TODO: Only add the instruction if the prop value != existing prop value
-                    instructions.push(Instruction::SetProperty(
-                        next.hash,
-                        name.clone(),
-                        value.clone(),
-                    ));
+                    let do_write = match existing.props.get(name) {
+                        Some(v) => v != value,
+                        None => true,
+                    };
+
+                    if do_write {
+                        existing
+                            .props
+                            .entry(name)
+                            .and_modify(|e| *e = value.clone())
+                            .or_insert(value.clone());
+
+                        instructions.push(Instruction::SetProperty(
+                            next.hash,
+                            name.clone(),
+                            value.clone(),
+                        ));
+                    }
                 }
 
                 // Visit children
@@ -199,7 +211,7 @@ mod tests {
             voice(String::from("v2"), 111.0),
         )];
 
-        let instructions = reconcile(&mut node_map, &graph);
+        let instructions = reconcile(&mut node_map, &graph2);
         insta::assert_json_snapshot!(instructions);
     }
 }
