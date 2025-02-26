@@ -215,19 +215,29 @@ namespace elem
 
             // Nothing to do if this root has stopped running or if it's aimed at
             // an invalid output channel
-            if (!rootPtr->stillRunning() || outChan < 0u || outChan >= ctx.numOutputChannels)
-            {
-                if (needsReset)
-                {
-                    for (size_t i = 0; i < nodeList.size(); ++i)
-                    {
-                        nodeList[i]->reset();
-                    }
-                    needsReset = false;
-                }
-                return;
-            }
-            needsReset = true;
+            //
+            // TODO: Bug here if we try to activate a previously deactivated root that has since
+            // stopped processing its subgraph within the same block. I've commented out for now
+            // which disables the optimization that skips deactivated graphs
+            //
+            // if (!rootPtr->stillRunning() || outChan < 0u || outChan >= ctx.numOutputChannels)
+            // {
+            //     // Hit the reset API for any graph nodes in this subgraph
+            //     //
+            //     // This way, if/when they become part of a new graph, they've had a chance
+            //     // to clear delay lines and such
+            //     if (needsReset)
+            //     {
+            //         for (size_t i = 0; i < nodeList.size(); ++i)
+            //         {
+            //             nodeList[i]->reset();
+            //         }
+            //         needsReset = false;
+            //     }
+            //     return;
+            // }
+
+            // needsReset = true;
 
             // Run the subsequence
             for (size_t i = 0; i < renderOps.size(); ++i) {
